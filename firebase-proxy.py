@@ -4,7 +4,7 @@
 #
 #A few settings
 MAXQUEUE = 100 #Maximum number of pending data to be stored
-NBPROC = 3 #Number of logging process to run
+NBPROC = 5 #Number of logging process to run
 POLICY = "first"  #Define what to do when the queue is full:
                   #     "first": drop the first element in the queue
                   #     "last":  drop the last element in the queue
@@ -28,7 +28,7 @@ class Logger:
         self.fbapp = pfb.FirebaseApplication(FBURL, authentication=None)
         #self.authenticate()
         self.data = None
-        self.lock = aio.Lock()
+        #self.lock = aio.Lock()
         self.myid = myid
         
     def authenticate(self):
@@ -37,6 +37,9 @@ class Logger:
     async def logging(self):
         _log.debug("Logging to {} -> {} value {}".format("/{}".format(FBTARGET),self.data["mac address"],self.data["data"]))
         self.fbapp.put_async("/{}".format(FBTARGET),self.data["mac address"],self.data["data"],callback=self.async_cb)
+        await aio.sleep(1)
+        while self.data:
+            await aio.sleep(0.5)
     
     def async_cb(self,resp):
         """Log data to Firebase by retrieving it from the queue"""
@@ -46,8 +49,8 @@ class Logger:
         #else:
         self.data=None
         
-        if self.lock.locked():
-            self.lock.release()
+        #if self.lock.locked():
+        #    self.lock.release()
       
     async def runme(self):
         global dataqueue
@@ -55,15 +58,15 @@ class Logger:
         while goon:
             try:
                 if self.data is None:
-                    _log.debug("Logger {} waiting for data".format(self.myid))
+                    _log.debug("Logger {} waiting for data. Len is {}, data is {}".format(self.myid,dataqueue.qsize(),self.data))
                     self.data = await dataqueue.get()
                     _log.debug("Logger {} got {}".format(self.myid, self.data))
                 else:
                     _log.debug("Logger {} trying again {}".format(self.myid, self.data))
-                await self.lock.acquire() # Previous run still on? Should not
+                #await self.lock.acquire() # Previous run still on? Should not
                 await self.logging()
-                await self.lock.acquire() # Wait for callback to return
-                self.lock.release()
+                #await self.lock.acquire() # Wait for callback to return
+                #self.lock.release()
             except aio.CancelledError as e:
                 goon = False
             except Exception as ex:
