@@ -40,8 +40,15 @@ class Logger:
         except:
             self.fbapp.put_async("/{}".format(FBTARGET+"/devices"),self.data["mac address"],self.data["data"],callback=self.async_cb)
         await aio.sleep(1)
+        tout = 6
         while self.data:
             await aio.sleep(0.5)
+            tout -= 1
+            if tout:
+                continue
+            _log.warning("Time out trying to send data to Firebase. data dropped.")
+            self.data = None
+           
     
     def async_cb(self,resp):
         """Log data to Firebase by retrieving it from the queue"""
